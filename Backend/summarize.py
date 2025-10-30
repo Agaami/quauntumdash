@@ -1,9 +1,3 @@
-# summarize.py
-"""
-Database Summarization Module
-Generates statistical summaries and AI-powered insights using LM Studio
-"""
-
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import sql
@@ -11,20 +5,33 @@ import requests
 from typing import Dict, Any, Optional
 from datetime import datetime
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# LM Studio Configuration from environment
+LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://127.0.0.1:1234")
+LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama-3.1-8b-instruct")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Validate required environment variables
+if not DATABASE_URL:
+    raise ValueError("❌ DATABASE_URL environment variable is not set")
 
 from prompt import SYSTEM_PROMPT, SUMMARIZATION_PROMPT, format_columns_for_prompt
-
-
-# LM Studio Configuration
-LM_STUDIO_BASE_URL = "http://127.0.0.1:1234"
-LLM_MODEL = "meta-llama-3.1-8b-instruct"
 
 
 class DatabaseSummarizer:
     """Generate AI-powered summaries of database tables"""
     
-    def __init__(self, connection_string: str):
-        self.connection_string = connection_string
+    def __init__(self, connection_string: str = None):
+        # Use provided connection_string or fall back to environment variable
+        self.connection_string = connection_string or DATABASE_URL
+        
+        if not self.connection_string:
+            raise ValueError("❌ Connection string must be provided or DATABASE_URL must be set")
     
     def get_db_connection(self):
         """Establish database connection"""
@@ -241,10 +248,15 @@ class DatabaseSummarizer:
 
 
 # Standalone function for background task
-def generate_summary_background(connection_string: str, table_name: str, user_id: str):
+def generate_summary_background(connection_string: str = None, table_name: str = None, user_id: str = None):
     """
     Background task function to generate summary
     This runs asynchronously after file upload completes
+    
+    Args:
+        connection_string: Optional custom connection string (uses DATABASE_URL from env if not provided)
+        table_name: Name of the table to summarize
+        user_id: ID of the user requesting the summary
     """
     try:
         print(f"\n{'='*70}")
@@ -253,7 +265,7 @@ def generate_summary_background(connection_string: str, table_name: str, user_id
         print(f"User ID: {user_id}")
         print(f"Table: {table_name}")
         
-        summarizer = DatabaseSummarizer(connection_string)
+        summarizer = DatabaseSummarizer(connection_string=connection_string)
         result = summarizer.generate_ai_summary(table_name)
         
         # Print AI insights to console
@@ -271,3 +283,5 @@ def generate_summary_background(connection_string: str, table_name: str, user_id
     except Exception as e:
         print(f"\n❌ Background summarization failed: {e}\n")
         return {"status": "error", "message": str(e)}
+
+
