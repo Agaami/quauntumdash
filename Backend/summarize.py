@@ -181,7 +181,12 @@ class DatabaseSummarizer:
             }
             
             print(f"🤖 Calling LM Studio at {url}...")
-            response = requests.post(url, json=payload, timeout=120)
+            
+            # --- THIS IS THE FIX ---
+            # Increase timeout from 120 (2 mins) to 300 (5 mins)
+            response = requests.post(url, json=payload, timeout=300)
+            # --- END OF FIX ---
+            
             response.raise_for_status()
             
             result = response.json()
@@ -283,5 +288,3 @@ def generate_summary_background(connection_string: str = None, table_name: str =
     except Exception as e:
         print(f"\n❌ Background summarization failed: {e}\n")
         return {"status": "error", "message": str(e)}
-
-
