@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #f8f9fa;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 300;">🔐 OTP Verification</h1>
+                <p style="color: #e8eaed; margin: 10px 0 0 0; font-size: 16px;">Secure access to your account</p>
+            </div>
+            <div style="padding: 40px 30px; background-color: white;">
+                <h2 style="color: #333; margin: 0 0 20px 0; font-size: 24px;">Hello! 👋</h2>
+                <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                    You requested a verification code for <strong>{{ purpose }}</strong>. 
+                    Here's your secure OTP code:
+                </p>
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                            padding: 25px; text-align: center; border-radius: 15px; margin: 30px 0; 
+                            box-shadow: 0 10px 25px rgba(240, 147, 251, 0.3);">
+                    <h1 style="color: white; letter-spacing: 8px; margin: 0; font-size: 36px; 
+                              font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                        {{ otp_code }}
+                    </h1>
+                </div>
+                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; 
+                            padding: 20px; margin: 25px 0;">
+                    <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.5;">
+                        <strong>⚠️ Important:</strong><br>
+                        • This OTP expires in <strong>{{ expiry_display }}</strong><br>
+                        • Use this code only once<br>
+                        • Maximum 3 verification attempts allowed
+                    </p>
+                </div>
+            </div>
+            <div style="background-color: #f8f9fa; padding: 25px 30px; border-top: 1px solid #e9ecef;">
+                <p style="color: #6c757d; font-size: 12px; text-align: center; margin: 0;">
+                    This is an automated email from <strong>QuantumDash</strong><br>
+                    Please do not reply to this email.
+                </p>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #f8f9fa;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 32px; font-weight: 600;">Welcome to QuantumDash! 🎉</h1>
+                <p style="color: #e8eaed; margin: 15px 0 0 0; font-size: 18px;">Your journey begins here</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style="padding: 40px 30px; background-color: white;">
+                <h2 style="color: #333; margin: 0 0 15px 0; font-size: 24px;">Hello {{ user_name }}! 👋</h2>
+                
+                <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                    Thank you for registering with <strong>QuantumDash</strong>! We're thrilled to have you on board. 
+                    Your account has been successfully created and is ready to use.
+                </p>
+                
+                <!-- Success Box -->
+                <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
+                            padding: 25px; text-align: center; border-radius: 15px; margin: 30px 0; 
+                            box-shadow: 0 10px 25px rgba(17, 153, 142, 0.3);">
+                    <h2 style="color: white; margin: 0; font-size: 20px; font-weight: 600;">
+                        ✅ Registration Complete!
+                    </h2>
+                    <p style="color: white; margin: 10px 0 0 0; font-size: 14px;">
+                        You can now access all features of QuantumDash
+                    </p>
+                </div>
+                
+                <!-- What's Next Section -->
+                <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 25px 0; border-radius: 5px;">
+                    <h3 style="color: #333; margin: 0 0 15px 0; font-size: 18px;">🚀 What's Next?</h3>
+                    <ul style="color: #555; font-size: 15px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                        <li>Explore your dashboard and features</li>
+                        <li>Complete your profile setup</li>
+                        <li>Check out our getting started guide</li>
+                        <li>Connect with our support team if you need help</li>
+                    </ul>
+                </div>
+                
+                <!-- Account Details -->
+                <div style="background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                    <h3 style="color: #1976d2; margin: 0 0 15px 0; font-size: 18px;">📧 Your Account Details</h3>
+                    <p style="color: #555; font-size: 15px; margin: 5px 0;">
+                        <strong>Email:</strong> {{ recipient_email }}
+                    </p>
+                </div>
+                
+                <!-- CTA Button -->
+                <div style="text-align: center; margin: 35px 0;">
+                    <a href="https://quantumdash.com/dashboard" 
+                       style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                              color: white; padding: 15px 40px; text-decoration: none; 
+                              border-radius: 50px; font-weight: 600; font-size: 16px; 
+                              display: inline-block; box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);">
+                        Get Started Now →
+                    </a>
+                </div>
+                
+                <!-- Support Section -->
+                <div style="border-top: 2px solid #e9ecef; padding-top: 25px; margin-top: 30px;">
+                    <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0;">
+                        <strong>Need Help?</strong><br>
+                        Our support team is here to assist you. Feel free to reach out anytime at 
+                        <a href="mailto:support@quantumdash.com" style="color: #667eea; text-decoration: none;">support@quantumdash.com</a>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #f8f9fa; padding: 25px 30px; border-top: 1px solid #e9ecef;">
+                <p style="color: #6c757d; font-size: 13px; text-align: center; margin: 0 0 10px 0;">
+                    <strong>QuantumDash</strong> - Empowering Your Digital Journey
+                </p>
+                <p style="color: #6c757d; font-size: 12px; text-align: center; margin: 0;">
+                    This is an automated welcome email. Please do not reply to this email.<br>
+                    © {{ current_year }} QuantumDash. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+</html>
