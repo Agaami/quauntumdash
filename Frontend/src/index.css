@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: theme('colors.light-bg');
+  color: theme('colors.text-dark');
+  overflow: hidden; 
+}
+
+/* Our new global "frosted glass" card style */
+@layer components {
+  .frosted-glass {
+    @apply bg-glass-bg border border-border-light shadow-lg;
+    /* This is the key to the macOS look */
+    backdrop-filter: blur(20px);
+  }
+}
