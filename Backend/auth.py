@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 import uuid
 from typing import Optional, Dict
 from datetime import datetime, timedelta
-import jwt
+from jose import jwt
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
