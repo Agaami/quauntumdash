@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, status
 from datetime import datetime, timedelta
 import uuid
 
-from auth import (
+from utils.authentication.auth import (
     UserRegistration,
     VerifyRegistrationOTP,
     UserSignin,

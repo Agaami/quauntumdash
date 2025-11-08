@@ -15,8 +15,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import data cleaning and summarization
-from data_cleaner import DataCleaner, CleaningOptions
-from summarize import DatabaseSummarizer, generate_summary_background
+from utils.data_ingestion.data_cleaner import DataCleaner, CleaningOptions
+from utils.summarize import DatabaseSummarizer, generate_summary_background
 
 
 # ==================== CONFIGURATION ====================

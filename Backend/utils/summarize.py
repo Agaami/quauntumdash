@@ -20,7 +20,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL environment variable is not set")
 
-from prompt import SYSTEM_PROMPT, SUMMARIZATION_PROMPT, format_columns_for_prompt
+from utils.prompt import SYSTEM_PROMPT, SUMMARIZATION_PROMPT, format_columns_for_prompt
 
 
 class DatabaseSummarizer:

@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
 # Import routers
-from auth_routes import router as auth_router
-from data_ingestion_routes import router as data_router
+from utils.authentication.auth_routes import router as auth_router
+from utils.data_ingestion.data_ingestion_routes import router as data_router
 
 # ==================== FASTAPI APP INITIALIZATION ====================
 

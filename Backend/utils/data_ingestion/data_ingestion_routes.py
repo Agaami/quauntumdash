@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status, Ba
 import uuid
 
 # Import from data_ingestion module
-from data_ingestion import (
+from utils.data_ingestion.data_ingestion import (
     FileUploadResponse,
     TableInfoResponse,
     SummaryResponse,
@@ -20,8 +20,8 @@ from data_ingestion import (
     DATABASE_URL
 )
 
-from data_cleaner import CleaningOptions
-from summarize import generate_summary_background
+from utils.data_ingestion.data_cleaner import CleaningOptions
+from utils.summarize import generate_summary_background
 
 
 # ==================== ROUTER CONFIGURATION ====================

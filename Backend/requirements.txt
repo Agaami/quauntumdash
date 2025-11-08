@@ -9,3 +9,5 @@ numpy
 passlib[bcrypt]
 bcrypt==3.2.0
 python-jose
+pydantic[email]
+python-multipart
