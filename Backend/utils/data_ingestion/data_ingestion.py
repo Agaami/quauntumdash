@@ -11,24 +11,31 @@ import numpy as np
 import os
 from dotenv import load_dotenv
 
+
 # Load environment variables
 load_dotenv()
 
+
 # Import data cleaning and summarization
 from utils.data_ingestion.data_cleaner import DataCleaner, CleaningOptions
-from utils.summarize import DatabaseSummarizer, generate_summary_background
+from utils.summarize import DatabaseSummarizer  # Removed generate_summary_background
+
 
 
 # ==================== CONFIGURATION ====================
+
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL not found in .env file")
 
+
 ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'xls'}
 
 
+
 # ==================== PYDANTIC MODELS ====================
+
 
 class FileUploadResponse(BaseModel):
     """Response model for file upload endpoint"""
@@ -41,7 +48,9 @@ class FileUploadResponse(BaseModel):
     file_type: str
     cleaning_applied: bool
     cleaning_report: Optional[dict] = None
+    summary: Optional[dict] = None  # CHANGED: Include summary in response
     summarization_status: str
+
 
 
 class TableInfoResponse(BaseModel):
@@ -50,6 +59,7 @@ class TableInfoResponse(BaseModel):
     row_count: int
     columns: list
     sample_data: Optional[list] = None
+
 
 
 class SummaryResponse(BaseModel):
@@ -63,7 +73,9 @@ class SummaryResponse(BaseModel):
     prompt_length: int
 
 
+
 # ==================== DATABASE FUNCTIONS ====================
+
 
 def get_db_connection():
     """
@@ -80,7 +92,9 @@ def get_db_connection():
         return None
 
 
+
 # ==================== UTILITY FUNCTIONS ====================
+
 
 def allowed_file(filename: str) -> bool:
     """
@@ -93,6 +107,7 @@ def allowed_file(filename: str) -> bool:
         True if file extension is allowed, False otherwise
     """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 
 def get_file_extension(filename: str) -> str:
@@ -108,10 +123,12 @@ def get_file_extension(filename: str) -> str:
     return filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
 
 
+
 def sanitize_table_name(user_id: str) -> str:
     """
     Create a valid PostgreSQL table name from user_id
     Removes special characters and converts to lowercase
+    Adds prefix if name starts with digit
     
     Args:
         user_id: User ID (usually UUID)
@@ -120,7 +137,13 @@ def sanitize_table_name(user_id: str) -> str:
         Sanitized table name safe for PostgreSQL
     """
     clean_id = re.sub(r'[^a-zA-Z0-9_]', '', user_id.replace('-', '_'))
-    return clean_id.lower()
+    clean_id = clean_id.lower()
+    
+    # Add prefix if starts with digit (PostgreSQL requirement)
+    if clean_id and clean_id[0].isdigit():
+        clean_id = f"{clean_id}"
+    
+    return clean_id
 
 
 def sanitize_column_name(col_name: str) -> str:
@@ -137,8 +160,9 @@ def sanitize_column_name(col_name: str) -> str:
     clean_name = str(col_name).strip().replace(' ', '_')
     clean_name = re.sub(r'[^a-zA-Z0-9_]', '', clean_name)
     if clean_name and clean_name[0].isdigit():
-        clean_name = f"col_{clean_name}"
+        clean_name = f"{clean_name}"
     return clean_name.lower() if clean_name else "unnamed_column"
+
 
 
 def infer_postgres_type(dtype) -> str:
@@ -165,6 +189,7 @@ def infer_postgres_type(dtype) -> str:
         return 'DATE'
     else:
         return 'TEXT'
+
 
 
 def read_file_to_dataframe(content: bytes, file_extension: str) -> pd.DataFrame:
@@ -208,7 +233,9 @@ def read_file_to_dataframe(content: bytes, file_extension: str) -> pd.DataFrame:
         raise Exception(f"Error reading file: {str(e)}")
 
 
+
 # ==================== TABLE CREATION ====================
+
 
 def create_table_from_dataframe(conn, table_name: str, df: pd.DataFrame, drop_if_exists: bool = True):
     """
@@ -273,7 +300,9 @@ def create_table_from_dataframe(conn, table_name: str, df: pd.DataFrame, drop_if
         cursor.close()
 
 
+
 # ==================== DATA INSERTION ====================
+
 
 def insert_dataframe_to_table(conn, table_name: str, df: pd.DataFrame):
     """
@@ -332,7 +361,9 @@ def insert_dataframe_to_table(conn, table_name: str, df: pd.DataFrame):
         cursor.close()
 
 
+
 # ==================== TABLE DELETION ====================
+
 
 def delete_table(conn, table_name: str):
     """
@@ -366,7 +397,9 @@ def delete_table(conn, table_name: str):
         cursor.close()
 
 
+
 # ==================== TABLE INFO RETRIEVAL ====================
+
 
 def get_table_info(conn, table_name: str) -> dict:
     """
@@ -430,7 +463,9 @@ def get_table_info(conn, table_name: str) -> dict:
         cursor.close()
 
 
+
 # ==================== TABLE EXISTENCE CHECK ====================
+
 
 def table_exists(conn, table_name: str) -> bool:
     """
@@ -463,7 +498,9 @@ def table_exists(conn, table_name: str) -> bool:
         cursor.close()
 
 
+
 # ==================== LIST ALL TABLES ====================
+
 
 def list_all_tables(conn) -> list:
     """
@@ -500,7 +537,9 @@ def list_all_tables(conn) -> list:
         cursor.close()
 
 
+
 # ==================== DATA INGESTION SERVICE ====================
+
 
 class DataIngestionService:
     """
@@ -537,18 +576,19 @@ class DataIngestionService:
         return df, cleaning_report
 
     @staticmethod
-    def upload_and_store(conn, user_id: str, df: pd.DataFrame, file_extension: str) -> tuple:
+    def upload_and_store(conn, user_id: str, df: pd.DataFrame, file_extension: str, generate_summary: bool = True) -> tuple:
         """
-        Upload file data to database and prepare for summarization
+        Upload file data to database and generate AI summary synchronously
         
         Args:
             conn: Database connection
             user_id: User ID (UUID)
             df: DataFrame with data
             file_extension: File extension (csv, xlsx, xls)
+            generate_summary: Whether to generate AI summary (default: True)
             
         Returns:
-            Tuple of (table_name, rows_inserted, sanitized_columns)
+            Tuple of (table_name, rows_inserted, sanitized_columns, summary_result)
             
         Raises:
             Exception: If upload fails
@@ -571,9 +611,23 @@ class DataIngestionService:
         rows_inserted = insert_dataframe_to_table(conn, table_name, df)
 
         print(f"✅ Successfully uploaded {rows_inserted} rows to '{table_name}'")
-        print(f"🔄 Triggering AI summarization in background...\n")
+        
+        # Generate summary synchronously
+        summary_result = None
+        if generate_summary:
+            print(f"🔄 Generating AI summary (this may take a moment)...\n")
+            try:
+                summarizer = DatabaseSummarizer(DATABASE_URL)
+                summary_result = summarizer.generate_ai_summary(table_name)
+                print(f"✅ AI summary generated successfully!")
+            except Exception as e:
+                print(f"⚠️ Warning: Summary generation failed: {e}")
+                summary_result = {
+                    "status": "failed",
+                    "error": str(e)
+                }
 
-        return table_name, rows_inserted, sanitized_columns
+        return table_name, rows_inserted, sanitized_columns, summary_result
 
     @staticmethod
     def get_summary(user_id: str) -> dict:

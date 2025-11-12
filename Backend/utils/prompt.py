@@ -1,5 +1,12 @@
+"""
+Prompts for SQL Agent and Data Summarization
+All LLM prompts are centralized here for easy maintenance
+"""
+
+# ==================== DATA ANALYSIS PROMPTS ====================
 
 SYSTEM_PROMPT = """You are an expert data analyst specializing in statistical analysis and business intelligence. Your role is to analyze database statistics and provide clear, actionable insights that help users understand their data quickly."""
+
 
 SUMMARIZATION_PROMPT = """
 Analyze this database summary and provide comprehensive insights:
@@ -41,6 +48,8 @@ Brief description of what this data represents based on column names and types.
 Keep your response structured, concise, and focused on actionable insights. Use bullet points where appropriate.
 """
 
+
+# ==================== HELPER FUNCTIONS ====================
 
 def format_columns_for_prompt(columns_summary: list) -> str:
     """Format column summaries into readable text for LLM prompt"""

@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, HTTPException, BackgroundTasks, status, Request, Depends
 from datetime import datetime, timedelta
 import uuid
+import json
+
 
 from utils.authentication.auth import (
     UserRegistration,
@@ -19,6 +21,17 @@ from utils.authentication.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
+# Import session management utilities
+from utils.session.session_manager import (
+    create_new_session, 
+    log_session_activity,
+    verify_session,
+    invalidate_session,
+    get_session_history
+)
+from utils.session.session_middleware import get_session_from_request
+
+
 # Create router with prefix and tags
 router = APIRouter(
     prefix="/api/auth",
@@ -27,10 +40,30 @@ router = APIRouter(
 )
 
 
+# Helper function to get client IP
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address from request"""
+    # Try to get real IP from headers (for proxy/load balancer scenarios)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    
+    # Fallback to direct client host
+    if request.client:
+        return request.client.host
+    
+    return "unknown"
+
+
 # ==================== REGISTRATION ENDPOINTS ====================
 
+
 @router.post("/register/initiate", response_model=RegistrationInitiateResponse, status_code=status.HTTP_200_OK)
-async def initiate_registration(user_data: UserRegistration, background_tasks: BackgroundTasks):
+async def initiate_registration(user_data: UserRegistration, request: Request, background_tasks: BackgroundTasks):
     """
     Step 1: Initiate registration
     - Validates user data
@@ -121,14 +154,16 @@ async def initiate_registration(user_data: UserRegistration, background_tasks: B
         )
 
 
-@router.post("/register/verify", response_model=RegistrationVerifyResponse, status_code=status.HTTP_201_CREATED)
-async def verify_registration(verification: VerifyRegistrationOTP):
+
+@router.post("/register/verify", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def verify_registration(verification: VerifyRegistrationOTP, request: Request):
     """
     Step 2: Verify OTP and complete registration
     - Verifies OTP code
     - Creates user account in database
-    - Cleans up cache
-    - Returns user details
+    - Creates session with unique session_id
+    - Logs registration action to session table
+    - Returns user details and session_id
     """
     try:
         # Get pending registration from cache
@@ -176,19 +211,57 @@ async def verify_registration(verification: VerifyRegistrationOTP):
             # Clean up cache
             cache.delete(f"pending_registration:{verification.email}")
             
-            print(f"\n✅ USER SUCCESSFULLY REGISTERED: {verification.email}\n")
+            # Get client information
+            client_ip = get_client_ip(request)
+            user_agent = request.headers.get('user-agent', 'unknown')
             
-            return RegistrationVerifyResponse(
-                status=True,
-                message="Registration completed successfully",
-                user={
+            # CREATE SESSION
+            session_data = create_new_session(
+                user_id=str(new_user['user_id']),
+                email=new_user['email'],
+                session_type="registration",
+                ip_address=client_ip,
+                user_agent=user_agent
+            )
+            
+            # LOG REGISTRATION ACTION TO SESSION TABLE
+            log_session_activity(
+                session_id=session_data["session_id"],
+                endpoint="/api/auth/register/verify",
+                method="POST",
+                request_path=str(request.url),
+                request_body=json.dumps({"email": verification.email, "otp_verified": True}),
+                response_status=201,
+                response_body=json.dumps({
+                    "message": "Registration completed successfully",
+                    "user_id": str(new_user['user_id'])
+                }),
+                ip_address=client_ip,
+                user_agent=user_agent,
+                additional_info={
+                    "action": "user_registration_completed",
+                    "user_type": new_user['user_type'],
+                    "registration_timestamp": datetime.utcnow().isoformat()
+                }
+            )
+            
+            print(f"\n✅ USER SUCCESSFULLY REGISTERED: {verification.email}")
+            print(f"✅ SESSION CREATED: {session_data['session_id']}")
+            print(f"✅ SESSION TABLE: {session_data['table_name']}\n")
+            
+            return {
+                "status": True,
+                "message": "Registration completed successfully",
+                "user": {
                     'user_id': str(new_user['user_id']),
                     'name': new_user['name'],
                     'email': new_user['email'],
                     'user_type': new_user['user_type'],
                     'created_at': new_user['created_at'].isoformat() if new_user['created_at'] else None
-                }
-            )
+                },
+                "session_id": session_data["session_id"],
+                "session_table": session_data["table_name"]
+            }
         
         except Exception as db_error:
             # Clean up cache even on error
@@ -205,6 +278,7 @@ async def verify_registration(verification: VerifyRegistrationOTP):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Verification failed: {e}"
         )
+
 
 
 @router.get("/register/status/{email}")
@@ -227,11 +301,19 @@ async def check_registration_status(email: str):
     }
 
 
+
 # ==================== SIGNIN ENDPOINT ====================
 
+
 @router.post("/signin", response_model=dict)
-async def signin_user(credentials: UserSignin):
-    """Sign in user with email and password"""
+async def signin_user(credentials: UserSignin, request: Request):
+    """
+    Sign in user with email and password
+    - Authenticates user credentials
+    - Creates new session with unique session_id
+    - Logs login action to session table
+    - Returns user details and session_id
+    """
     try:
         user = UserDatabase.authenticate_user(credentials.email, credentials.password)
         
@@ -242,17 +324,49 @@ async def signin_user(credentials: UserSignin):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user["email"]},
-            expires_delta=access_token_expires
+        # Get client information
+        client_ip = get_client_ip(request)
+        user_agent = request.headers.get('user-agent', 'unknown')
+        
+        # CREATE SESSION
+        session_data = create_new_session(
+            user_id=str(user['user_id']),
+            email=user['email'],
+            session_type="login",
+            ip_address=client_ip,
+            user_agent=user_agent
         )
+        
+        # LOG LOGIN ACTION TO SESSION TABLE
+        log_session_activity(
+            session_id=session_data["session_id"],
+            endpoint="/api/auth/signin",
+            method="POST",
+            request_path=str(request.url),
+            request_body=json.dumps({"email": credentials.email}),
+            response_status=200,
+            response_body=json.dumps({
+                "message": "Login successful",
+                "user_id": str(user['user_id'])
+            }),
+            ip_address=client_ip,
+            user_agent=user_agent,
+            additional_info={
+                "action": "user_login",
+                "user_type": user['user_type'],
+                "login_timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        print(f"\n✅ USER LOGGED IN: {credentials.email}")
+        print(f"✅ SESSION CREATED: {session_data['session_id']}")
+        print(f"✅ SESSION TABLE: {session_data['table_name']}\n")
         
         return {
             "message": "Login successful",
             "user": user,
-            "access_token": access_token,
-            "token_type": "bearer"
+            "session_id": session_data["session_id"],
+            "session_table": session_data["table_name"]
         }
     
     except HTTPException:
@@ -264,11 +378,131 @@ async def signin_user(credentials: UserSignin):
         )
 
 
+
+# ==================== SESSION MANAGEMENT ENDPOINTS ====================
+
+
+@router.post("/logout")
+async def logout_user(request: Request, session_data: dict = Depends(get_session_from_request)):
+    """
+    Logout user and invalidate session
+    - Logs logout action to session table
+    - Marks session as inactive
+    """
+    try:
+        session_id = request.state.session_id
+        client_ip = get_client_ip(request)
+        user_agent = request.headers.get('user-agent', 'unknown')
+        
+        # Log logout action
+        log_session_activity(
+            session_id=session_id,
+            endpoint="/api/auth/logout",
+            method="POST",
+            request_path=str(request.url),
+            request_body=None,
+            response_status=200,
+            response_body=json.dumps({"message": "Logout successful"}),
+            ip_address=client_ip,
+            user_agent=user_agent,
+            additional_info={
+                "action": "user_logout",
+                "logout_timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        # Invalidate session
+        invalidate_session(session_id)
+        
+        print(f"\n✅ USER LOGGED OUT")
+        print(f"✅ SESSION INVALIDATED: {session_id}\n")
+        
+        return {
+            "message": "Logout successful",
+            "session_id": session_id
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Logout failed: {e}"
+        )
+
+
+
+@router.get("/session-history")
+async def get_user_session_history(
+    request: Request,
+    session_data: dict = Depends(get_session_from_request)
+):
+    """
+    Get activity history for current session
+    - Returns all logged actions for the session
+    """
+    try:
+        session_id = request.state.session_id
+        history = get_session_history(session_id)
+        
+        return {
+            "session_id": session_id,
+            "user_id": session_data["user_id"],
+            "email": session_data["email"],
+            "total_activities": len(history),
+            "session_created_at": session_data["created_at"],
+            "last_activity": session_data["last_activity"],
+            "history": history
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve session history: {e}"
+        )
+
+
+
+@router.get("/verify-session")
+async def verify_user_session(
+    request: Request,
+    session_data: dict = Depends(get_session_from_request)
+):
+    """
+    Verify if current session is valid
+    - Returns session information
+    """
+    return {
+        "status": "valid",
+        "message": "Session is active and valid",
+        "session_data": {
+            "session_id": session_data["session_id"],
+            "user_id": session_data["user_id"],
+            "email": session_data["email"],
+            "session_type": session_data["session_type"],
+            "created_at": str(session_data["created_at"]),
+            "last_activity": str(session_data["last_activity"]),
+            "is_active": session_data["is_active"]
+        }
+    }
+
+
+
 # ==================== DELETE USER ENDPOINTS ====================
 
+
 @router.delete("/delete-user/{user_id}", response_model=DeleteUserResponse, status_code=status.HTTP_200_OK)
-async def delete_user_by_id(user_id: str):
-    """Delete user by user_id"""
+async def delete_user_by_id(
+    user_id: str, 
+    request: Request,
+    session_data: dict = Depends(get_session_from_request)
+):
+    """
+    Delete user by user_id (requires active session)
+    - Logs deletion action to session table
+    """
     try:
         # Validate UUID format
         try:
@@ -286,6 +520,31 @@ async def delete_user_by_id(user_id: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with ID {user_id} not found"
             )
+        
+        # Log deletion action
+        session_id = request.state.session_id
+        client_ip = get_client_ip(request)
+        user_agent = request.headers.get('user-agent', 'unknown')
+        
+        log_session_activity(
+            session_id=session_id,
+            endpoint=f"/api/auth/delete-user/{user_id}",
+            method="DELETE",
+            request_path=str(request.url),
+            request_body=None,
+            response_status=200,
+            response_body=json.dumps({
+                "deleted_user_id": user_id,
+                "deleted_user_email": deleted_user['email']
+            }),
+            ip_address=client_ip,
+            user_agent=user_agent,
+            additional_info={
+                "action": "user_deletion",
+                "deleted_user_name": deleted_user['name'],
+                "deletion_timestamp": datetime.utcnow().isoformat()
+            }
+        )
         
         return DeleteUserResponse(
             message=f"User {deleted_user['name']} ({deleted_user['email']}) has been successfully deleted",
@@ -309,9 +568,17 @@ async def delete_user_by_id(user_id: str):
         )
 
 
+
 @router.delete("/delete-user-by-email/{email}", response_model=DeleteUserResponse, status_code=status.HTTP_200_OK)
-async def delete_user_by_email(email: str):
-    """Delete user by email address"""
+async def delete_user_by_email(
+    email: str,
+    request: Request,
+    session_data: dict = Depends(get_session_from_request)
+):
+    """
+    Delete user by email address (requires active session)
+    - Logs deletion action to session table
+    """
     try:
         # Validate email format
         if "@" not in email or "." not in email:
@@ -327,6 +594,31 @@ async def delete_user_by_email(email: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with email {email} not found"
             )
+        
+        # Log deletion action
+        session_id = request.state.session_id
+        client_ip = get_client_ip(request)
+        user_agent = request.headers.get('user-agent', 'unknown')
+        
+        log_session_activity(
+            session_id=session_id,
+            endpoint=f"/api/auth/delete-user-by-email/{email}",
+            method="DELETE",
+            request_path=str(request.url),
+            request_body=None,
+            response_status=200,
+            response_body=json.dumps({
+                "deleted_user_id": str(deleted_user["user_id"]),
+                "deleted_user_email": email
+            }),
+            ip_address=client_ip,
+            user_agent=user_agent,
+            additional_info={
+                "action": "user_deletion_by_email",
+                "deleted_user_name": deleted_user['name'],
+                "deletion_timestamp": datetime.utcnow().isoformat()
+            }
+        )
         
         return DeleteUserResponse(
             message=f"User {deleted_user['name']} ({deleted_user['email']}) has been successfully deleted",
